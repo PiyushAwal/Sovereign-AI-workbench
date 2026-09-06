@@ -1,0 +1,115 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sovereign AI Workbench</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <div class="max-w-6xl mx-auto py-8 px-4">
+    <header class="border-b border-slate-800 pb-4 mb-8 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+          <span class="inline-block w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+          Sovereign AI Workbench
+        </h1>
+        <p class="text-sm text-slate-400 mt-1">Confidential Industrial Agentic AI Platform</p>
+      </div>
+      <div id="healthBadge" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-md text-xs font-mono text-emerald-400">
+        Ollama: Online (llama3.2:latest)
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- AI Copilot / RAG -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col h-[520px]">
+        <h2 class="text-lg font-semibold mb-2 flex items-center justify-between">
+          <span>AI Knowledge Assistant</span>
+          <span class="text-xs bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">RAG Enabled</span>
+        </h2>
+        <div id="chatBox" class="flex-1 overflow-y-auto space-y-3 bg-slate-950/70 p-4 rounded-lg border border-slate-800/80 mb-4 text-sm font-sans">
+          <div class="text-slate-400 italic">Ready for confidential queries. Enter a prompt below...</div>
+        </div>
+        <div class="flex gap-2">
+          <input id="promptInput" type="text" placeholder="e.g. Turbine vibration mitigation steps..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <button onclick="sendPrompt()" id="sendBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition">Run</button>
+        </div>
+      </section>
+
+      <!-- Autonomous Agent Task Worker -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col h-[520px]">
+        <h2 class="text-lg font-semibold mb-2 flex items-center justify-between">
+          <span>Autonomous Agent Tasks</span>
+          <span class="text-xs bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Background Worker</span>
+        </h2>
+        <div class="space-y-3 mb-4">
+          <input id="taskTitle" type="text" placeholder="Task Title" value="Turbine Harmonic Vibration Analysis" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <textarea id="taskDesc" rows="2" placeholder="Task Description" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">Inspect 45Hz harmonic resonance on generator bearing 2 and recommend mitigation protocol.</textarea>
+          <button onclick="createAndRunTask()" id="taskBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg text-sm transition">Dispatch Autonomous Agent</button>
+        </div>
+        <div id="taskConsole" class="flex-1 overflow-y-auto bg-slate-950/70 p-4 rounded-lg border border-slate-800/80 text-xs font-mono text-slate-300 whitespace-pre-wrap">
+Agent standing by.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    async function sendPrompt() {
+      const input = document.getElementById("promptInput");
+      const box = document.getElementById("chatBox");
+      const btn = document.getElementById("sendBtn");
+      const q = input.value.trim();
+      if (!q) return;
+      btn.disabled = true;
+      btn.innerText = "...";
+      box.innerHTML += `<div class="text-emerald-400 font-semibold mt-2">You: <span class="text-slate-200 font-normal">${q}</span></div>`;
+      input.value = "";
+      box.scrollTop = box.scrollHeight;
+      try {
+        const res = await fetch("/ai/ask", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({query: q, use_rag: true})
+        });
+        const data = await res.json();
+        box.innerHTML += `<div class="text-slate-300 bg-slate-900/90 border border-slate-800 p-3 rounded mt-2 whitespace-pre-wrap"><span class="text-emerald-400 font-bold block mb-1">AI (${data.model}):</span>${data.response}</div>`;
+      } catch (err) {
+        box.innerHTML += `<div class="text-red-400 mt-2">Error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Run";
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
+    async function createAndRunTask() {
+      const title = document.getElementById("taskTitle").value.trim();
+      const desc = document.getElementById("taskDesc").value.trim();
+      const consoleBox = document.getElementById("taskConsole");
+      const btn = document.getElementById("taskBtn");
+      btn.disabled = true;
+      btn.innerText = "Executing Task...";
+      consoleBox.innerText = `[INFO] Initializing task...\n[INFO] Title: ${title}\n[STATUS] Dispatching to local Ollama agent...`;
+      try {
+        const createRes = await fetch("/tasks/", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({title: title, description: desc, task_type: "analysis", project_id: 1})
+        });
+        const taskData = await createRes.json();
+        consoleBox.innerText += `\n[SUCCESS] Task #${taskData.id} recorded in PostgreSQL. Running LLM...`;
+        const runRes = await fetch(`/ai/tasks/${taskData.id}/run`, {method: "POST"});
+        const runData = await runRes.json();
+        consoleBox.innerText += `\n[COMPLETED] Agent finished successfully!\n\n--- OUTPUT REPORT ---\n` + runData.output;
+      } catch (err) {
+        consoleBox.innerText += `\n[ERROR] ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Dispatch Autonomous Agent";
+      }
+    }
+  </script>
+</body>
+</html>
